@@ -757,8 +757,12 @@ func validateHandoffOutputRefs(p *ChunkGraphPlan) []ValidationIssue {
 	}
 	reachabilityAdj := make(map[string][]string, len(p.Chunks))
 	for _, edge := range p.Edges {
-		if strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "handoff") ||
-			strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "loop_back") {
+		// loop_back edges point backward and would create false positives in the
+		// forward-reachability traversal; skip them. Handoff edges ARE included
+		// because they represent explicit upstream dependencies (e.g. fan-in
+		// topologies where branch B → final is only a handoff edge, not a
+		// control edge, yet B is a legitimate upstream for final).
+		if strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "loop_back") {
 			continue
 		}
 		if _, ok := chunkIDSet[edge.FromChunkID]; !ok {

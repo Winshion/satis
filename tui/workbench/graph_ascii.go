@@ -232,7 +232,10 @@ func buildGraphAdjacency(plan *bridge.ChunkGraphPlan) (map[string][]string, map[
 		chunkSet[chunk.ChunkID] = struct{}{}
 	}
 	for _, edge := range plan.Edges {
-		if isHandoffWorkbenchEdgeKind(edge.EdgeKind) || strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "loop_back") {
+		// loop_back is intentionally excluded from forward structural layout
+		// because it points to already-executed ancestors. Handoff edges should
+		// be rendered so fan-in links are visible after save-time topology sync.
+		if strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "loop_back") {
 			continue
 		}
 		if _, ok := chunkSet[edge.FromChunkID]; !ok {

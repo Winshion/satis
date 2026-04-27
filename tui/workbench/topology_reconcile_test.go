@@ -239,6 +239,121 @@ func TestBuildDerivedTopologyTreatsDecisionBackEdgeAsLoopBack(t *testing.T) {
 	}
 }
 
+// TestFanInTopologyValidatesAfterAutoSave reproduces the bug where creating a
+// "final" chunk that consumes handoff inputs from two parallel branches
+// (ROOT → CHK_A, ROOT → CHK_B, both feeding CHK_FINAL) would always fail with
+// "upstream chunk not reachable" during auto-save ValidateAndNormalize, even
+// though the plan topology was structurally correct.
+//
+// Topology:
+//
+//	CHK_ROOT ──control──► CHK_A ──control──► CHK_FINAL
+//	CHK_ROOT ──control──► CHK_B ──handoff──► CHK_FINAL
+func TestFanInTopologyValidatesAfterAutoSave(t *testing.T) {
+	// Build the base model with a ROOT that outputs @port_root__output.
+	model := &Model{
+		Plan: &bridge.ChunkGraphPlan{
+			IntentID:          "intent_fanin_wb",
+			IntentDescription: "fan-in workbench test",
+			PlanDescription:   "fan-in plan validation",
+			Chunks: []bridge.PlanChunk{
+				{
+					ChunkID:     "CHK_ROOT",
+					Kind:        "task",
+					Description: "输出立直麻将介绍",
+					Source: bridge.ChunkSource{
+						Format:    "satis_v1",
+						SatisText: "chunk_id: CHK_ROOT\nintent_uid: intent_fanin_wb\ndescription: 输出立直麻将介绍\nchunk_port: port_root\n\ninvoke [[[简短介绍立直麻将]]] as @port_root__output\n",
+					},
+				},
+			},
+			EntryChunks: []string{"CHK_ROOT"},
+		},
+		SelectedChunkID: "CHK_ROOT",
+	}
+
+	// Step 1: Add CHK_A as child of CHK_ROOT (translates to Japanese).
+	chkAID, _, err := model.AddChildChunk("CHK_ROOT")
+	if err != nil {
+		t.Fatalf("AddChildChunk(CHK_A): %v", err)
+	}
+	chkA := model.ChunkByID(chkAID)
+	if chkA == nil {
+		t.Fatalf("missing CHK_A chunk")
+	}
+	chkA.Source.SatisText = "chunk_id: " + chkAID + "\nintent_uid: intent_fanin_wb\ndescription: 翻译到日文\nchunk_port: port_a\n\ninvoke [[[翻译到日文：]]] @port_root__output as @port_a__japanese\n"
+	chkA.Description = "翻译到日文"
+
+	// Step 2: Add CHK_B as child of CHK_ROOT (translates to English).
+	model.SelectedChunkID = "CHK_ROOT"
+	chkBID, _, err := model.AddChildChunk("CHK_ROOT")
+	if err != nil {
+		t.Fatalf("AddChildChunk(CHK_B): %v", err)
+	}
+	chkB := model.ChunkByID(chkBID)
+	if chkB == nil {
+		t.Fatalf("missing CHK_B chunk")
+	}
+	chkB.Source.SatisText = "chunk_id: " + chkBID + "\nintent_uid: intent_fanin_wb\ndescription: 翻译到英文\nchunk_port: port_b\n\ninvoke [[[翻译到英文：]]] @port_root__output as @port_b__english\n"
+	chkB.Description = "翻译到英文"
+
+	// Step 3: Add CHK_FINAL as child of CHK_A (fan-in node, reads from both A and B).
+	model.SelectedChunkID = chkAID
+	chkFinalID, _, err := model.AddChildChunk(chkAID)
+	if err != nil {
+		t.Fatalf("AddChildChunk(CHK_FINAL): %v", err)
+	}
+	chkFinal := model.ChunkByID(chkFinalID)
+	if chkFinal == nil {
+		t.Fatalf("missing CHK_FINAL chunk")
+	}
+	// Manually set the fan-in body: consumes @port_a__japanese AND @port_b__english.
+	chkFinal.Source.SatisText = "chunk_id: " + chkFinalID + "\nintent_uid: intent_fanin_wb\ndescription: 合并翻译结果\nchunk_port: port_final\n\nconcat @port_a__japanese @port_b__english as @port_final__merged\n"
+	chkFinal.Description = "合并翻译结果"
+	// Declare handoff_inputs for both upstream branches.
+	chkFinal.Inputs = map[string]any{
+		"handoff_inputs": map[string]any{
+			"port_a__japanese": map[string]any{
+				"from_step": chkAID,
+				"var_name":  "japanese",
+			},
+			"port_b__english": map[string]any{
+				"from_step": chkBID,
+				"var_name":  "english",
+			},
+		},
+	}
+
+	// Step 4: Sync edges from handoff declarations (mimics auto-save syncPlanTopology).
+	if err := model.SyncEdgesFromHandoffs(); err != nil {
+		t.Fatalf("SyncEdgesFromHandoffs: %v", err)
+	}
+
+	// Verify that a handoff edge CHK_B → CHK_FINAL was generated.
+	foundHandoff := false
+	for _, edge := range model.Plan.Edges {
+		if edge.FromChunkID == chkBID && edge.ToChunkID == chkFinalID &&
+			strings.EqualFold(strings.TrimSpace(edge.EdgeKind), "handoff") {
+			foundHandoff = true
+			break
+		}
+	}
+	if !foundHandoff {
+		t.Fatalf("expected handoff edge %s → %s to be generated, edges: %#v", chkBID, chkFinalID, model.Plan.Edges)
+	}
+
+	// Step 5: ValidateAndNormalize (this is what Workbench auto-save calls).
+	// Before the fix this always returned "upstream chunk not reachable" for CHK_B.
+	if err := model.ValidateAndNormalize(); err != nil {
+		t.Fatalf("ValidateAndNormalize failed (fan-in handoff edge must be accepted): %v", err)
+	}
+
+	// Sanity: entry chunk is still CHK_ROOT.
+	if len(model.Plan.EntryChunks) != 1 || model.Plan.EntryChunks[0] != "CHK_ROOT" {
+		t.Fatalf("unexpected entry chunks: %#v", model.Plan.EntryChunks)
+	}
+}
+
 func TestLinkPlanChainUpdatesHiddenRegistry(t *testing.T) {
 	backend := &memoryWorkbenchBackend{files: map[string]string{}}
 	currentPath := "/demo/a/plan.json"
