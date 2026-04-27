@@ -1,0 +1,23 @@
+{
+  "providers": {
+    "your-llm-01": {
+      "base_url": "http://127.0.0.1:18123/v1/",
+      "api_key": "sk-yourapikey",
+      "model": "your-llm-model-name (e.g. GPT-5.4)",
+      "timeout_seconds": 120,
+      "temperature": 0.2,
+      "max_tokens": 4096
+    },
+    "your-llm-02": {
+      "base_url": "http://127.0.0.1:18123/v1/",
+      "api_key": "sk-yourapikey",
+      "model": "your-llm-model-name (e.g. Gemini 3.1 Pro)",
+      "timeout_seconds": 120,
+      "temperature": 0.2,
+      "max_tokens": 4096
+    }
+  },
+  "router": {
+    "default_provider": "your-llm-01"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "backend": "disk",
+  "mount_dir": "your/absolute/path/to/satis_backend/mounted",
+  "state_dir": "your/absolute/path/to/satis_backend/satis_vfs",
+  "system_port_dir": "your/absolute/path/to/satis_backend/system_port",
+  "software_registry_dir": "your/absolute/path/to/satis_backend/software_registry",
+  "gc": {
+    "deleted_file_retention": 0,
+    "max_events": 2048
+  }
+}

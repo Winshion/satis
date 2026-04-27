@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/start_run_params.schema.json",
+  "title": "StartRunParams",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plan_id"],
+  "properties": {
+    "plan_id": { "$ref": "common.defs.json#/$defs/plan_id" },
+    "execution_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dry_run": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

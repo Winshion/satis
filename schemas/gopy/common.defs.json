@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/common.defs.json",
+  "$defs": {
+    "protocol_version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "chunk_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "file_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "virtual_path": {
+      "type": "string"
+    },
+    "artifact_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "virtual_path": { "type": "string" },
+        "file_id": { "type": "string" }
+      }
+    },
+    "inspect_run_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_chunks", "terminal", "artifact_total"],
+      "properties": {
+        "plan_id": { "type": "string" },
+        "total_chunks": { "type": "integer", "minimum": 0 },
+        "terminal": { "type": "boolean" },
+        "failed_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "blocked_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "succeeded_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "running_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "ready_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "pending_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "cancelled_chunk_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chunk_id" }
+        },
+        "artifact_total": { "type": "integer", "minimum": 0 },
+        "run_error_code": { "type": "string" },
+        "run_error_message": { "type": "string" },
+        "primary_failure_chunk_id": { "type": "string" },
+        "primary_failure_code": { "type": "string" },
+        "primary_failure_stage": { "type": "string" },
+        "failure_layer": { "type": "string" }
+      }
+    },
+    "structured_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "stage", "retryable"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "stage": {
+          "type": "string",
+          "enum": ["planning", "validation", "scheduling", "execution", "vfs", "invoke"]
+        },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    },
+    "validation_issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "field": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

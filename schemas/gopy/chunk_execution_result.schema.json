@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/chunk_execution_result.schema.json",
+  "title": "ChunkExecutionResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["chunk_id", "status"],
+  "properties": {
+    "chunk_id": { "$ref": "common.defs.json#/$defs/chunk_id" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "ready",
+        "running",
+        "succeeded",
+        "failed",
+        "blocked",
+        "cancelled"
+      ]
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "objects": { "type": "object", "additionalProperties": true },
+    "values": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "notes": { "type": "array", "items": { "type": "string" } },
+    "supplementary_info": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "artifacts_emitted": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/artifact_spec" }
+    },
+    "error": {
+      "oneOf": [{ "type": "null" }, { "$ref": "common.defs.json#/$defs/structured_error" }]
+    }
+  }
+}

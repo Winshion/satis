@@ -1,0 +1,16 @@
+RUNTIME_MINIMAL_BUNDLE_README.md
+invoke.config.json
+vfs.config.json
+
+# Local test scripts
+test*.sh
+test*.bash
+test*.zsh
+test*.py
+*_test.sh
+*_test.bash
+*_test.zsh
+*_test.py
+
+.gochache/
+.gomodcache/

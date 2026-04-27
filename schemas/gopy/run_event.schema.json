@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/run_event.schema.json",
+  "title": "RunEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "event_id", "run_id", "ts", "type", "payload"],
+  "properties": {
+    "protocol_version": { "$ref": "common.defs.json#/$defs/protocol_version" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "run_id": { "$ref": "common.defs.json#/$defs/run_id" },
+    "chunk_id": {
+      "oneOf": [{ "type": "null" }, { "$ref": "common.defs.json#/$defs/chunk_id" }]
+    },
+    "ts": { "type": "string", "format": "date-time" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "run_started",
+        "chunk_ready",
+        "chunk_started",
+        "chunk_succeeded",
+        "chunk_failed",
+        "chunk_blocked",
+        "artifact_emitted",
+        "object_changed",
+        "run_completed",
+        "run_failed"
+      ]
+    },
+    "payload": { "type": "object" }
+  }
+}

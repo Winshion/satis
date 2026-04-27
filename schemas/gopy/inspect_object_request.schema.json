@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/inspect_object_request.schema.json",
+  "title": "InspectObjectParams",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "file_id": { "$ref": "common.defs.json#/$defs/file_id" },
+    "virtual_path": { "$ref": "common.defs.json#/$defs/virtual_path" }
+  },
+  "oneOf": [
+    {
+      "required": ["file_id"]
+    },
+    {
+      "required": ["virtual_path"]
+    }
+  ]
+}

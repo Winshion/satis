@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/run_status.schema.json",
+  "title": "RunStatus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "run_id",
+    "plan_id",
+    "status",
+    "chunk_statuses",
+    "started_at",
+    "updated_at"
+  ],
+  "properties": {
+    "protocol_version": { "$ref": "common.defs.json#/$defs/protocol_version" },
+    "run_id": { "$ref": "common.defs.json#/$defs/run_id" },
+    "plan_id": { "$ref": "common.defs.json#/$defs/plan_id" },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "running", "paused", "completed", "failed", "cancelled"]
+    },
+    "chunk_statuses": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "running",
+          "succeeded",
+          "failed",
+          "blocked",
+          "cancelled"
+        ]
+      }
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "error": {
+      "oneOf": [{ "type": "null" }, { "$ref": "common.defs.json#/$defs/structured_error" }]
+    }
+  }
+}

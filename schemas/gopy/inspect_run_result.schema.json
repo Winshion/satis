@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/inspect_run_result.schema.json",
+  "title": "InspectRunResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run", "chunks", "events", "summary"],
+  "properties": {
+    "run": { "$ref": "run_status.schema.json" },
+    "chunks": {
+      "type": "object",
+      "additionalProperties": { "$ref": "chunk_execution_result.schema.json" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "run_event.schema.json" }
+    },
+    "summary": { "$ref": "common.defs.json#/$defs/inspect_run_summary" }
+  }
+}

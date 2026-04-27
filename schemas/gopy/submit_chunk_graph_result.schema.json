@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/submit_chunk_graph_result.schema.json",
+  "title": "SubmitChunkGraphResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["accepted", "validation_errors"],
+  "properties": {
+    "accepted": { "type": "boolean" },
+    "validation_errors": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/validation_issue" }
+    },
+    "normalized_plan": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "chunk_graph_plan.schema.json" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/gopy/chunk_graph_plan.schema.json",
+  "title": "ChunkGraphPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "plan_id",
+    "intent_id",
+    "intent_description",
+    "plan_description",
+    "goal",
+    "chunks",
+    "edges",
+    "entry_chunks"
+  ],
+  "properties": {
+    "protocol_version": { "$ref": "common.defs.json#/$defs/protocol_version" },
+    "plan_id": { "$ref": "common.defs.json#/$defs/plan_id" },
+    "intent_id": { "type": "string", "minLength": 1 },
+    "intent_description": { "type": "string", "minLength": 1 },
+    "plan_description": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string" },
+    "chunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/plan_chunk" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/plan_edge" }
+    },
+    "entry_chunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.defs.json#/$defs/chunk_id" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact_spec" }
+    },
+    "planner_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "policies": { "$ref": "#/$defs/plan_policies" }
+  },
+  "$defs": {
+    "plan_chunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chunk_id", "kind", "description", "source"],
+      "properties": {
+        "chunk_id": { "$ref": "common.defs.json#/$defs/chunk_id" },
+        "kind": {
+          "type": "string",
+          "enum": ["read", "transform", "write", "patch", "invoke", "compound", "satis", "task", "decision", "planner"]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["satis_text"],
+          "properties": {
+            "satis_text": { "type": "string" },
+            "format": { "type": "string", "enum": ["satis_v1"], "default": "satis_v1" }
+          }
+        },
+        "decision": { "$ref": "#/$defs/decision_spec" },
+        "planner": { "$ref": "#/$defs/planner_spec" },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "$ref": "common.defs.json#/$defs/chunk_id" }
+        },
+        "retry_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_attempts": { "type": "integer", "minimum": 0 },
+            "backoff_ms": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "timeout_ms": { "type": "integer", "minimum": 0 },
+        "idempotency_key": { "type": "string" },
+        "approval_mode": {
+          "type": "string",
+          "enum": ["none", "required_before_run", "required_on_write"]
+        },
+        "repeat": { "$ref": "#/$defs/chunk_repeat" }
+      }
+    },
+    "plan_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_chunk_id", "to_chunk_id"],
+      "properties": {
+        "from_chunk_id": { "$ref": "common.defs.json#/$defs/chunk_id" },
+        "to_chunk_id": { "$ref": "common.defs.json#/$defs/chunk_id" },
+        "edge_kind": {
+          "type": "string",
+          "enum": ["control", "data", "branch", "default", "planner_exit", "loop_back"],
+          "default": "control"
+        },
+        "branch": { "type": "string" }
+        ,
+        "loop_policy": { "$ref": "#/$defs/loop_policy" }
+      }
+    },
+    "decision_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_branches", "interaction"],
+      "properties": {
+        "allowed_branches": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "default_branch": { "type": "string" },
+        "interaction": { "$ref": "#/$defs/interaction_spec" }
+      }
+    },
+    "planner_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_branches", "interaction"],
+      "properties": {
+        "exit_branches": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "default_exit": { "type": "string" },
+        "interaction": { "$ref": "#/$defs/interaction_spec" }
+      }
+    },
+    "interaction_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["human", "llm", "llm_then_human"] },
+        "llm": { "$ref": "#/$defs/llm_interaction" },
+        "human": { "$ref": "#/$defs/human_interaction" }
+      }
+    },
+    "llm_interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_prompt_template"],
+      "properties": {
+        "system_prompt_ref": { "type": "string" },
+        "developer_prompt_ref": { "type": "string" },
+        "user_prompt_template": { "type": "string" },
+        "temperature": { "type": "number" },
+        "max_tokens": { "type": "integer", "minimum": 0 },
+        "context_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_binding" }
+        }
+      }
+    },
+    "human_interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "context_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "from_input": { "type": "string" }
+      }
+    },
+    "artifact_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "virtual_path": { "$ref": "common.defs.json#/$defs/virtual_path" },
+        "file_id": { "$ref": "common.defs.json#/$defs/file_id" }
+      }
+    },
+    "plan_policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_parallel_chunks": { "type": "integer", "minimum": 1 },
+        "fail_fast": { "type": "boolean" },
+        "require_approval_for_plan": { "type": "boolean" }
+      }
+    },
+    "loop_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": { "type": "integer", "minimum": 1 },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

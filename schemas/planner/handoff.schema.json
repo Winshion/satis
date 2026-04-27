@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://satis.local/schemas/planner/handoff.schema.json",
+  "title": "PlannerHandoff",
+  "$defs": {
+    "consumer_hints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "loader": {
+          "type": "string",
+          "enum": ["auto", "text", "markdown", "json", "blob"]
+        },
+        "read_mode": {
+          "type": "string",
+          "enum": ["full", "lines"]
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "slice_mode": {
+          "type": "string",
+          "enum": ["none", "head", "tail"]
+        },
+        "slice_lines": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requires_normalization": {
+          "type": "boolean"
+        }
+      }
+    },
+    "runtime_handoff_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "virtual_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "loader": {
+          "type": "string"
+        },
+        "special_load_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "port_handoff_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "consumer_hints": {
+          "$ref": "#/$defs/consumer_hints"
+        },
+        "runtime": {
+          "$ref": "#/$defs/runtime_handoff_record"
+        }
+      }
+    }
+  }
+}
