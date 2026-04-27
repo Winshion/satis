@@ -367,3 +367,5 @@ To view a copy of this license, visit [http://creativecommons.org/licenses/by-nc
 
 
 当然，`documents/Documents_EN/satis_s_story`里的文档也挺有意思的！
+
+> 本README文档大部分由 LLM 辅助撰写，我提供写作思路与灵感

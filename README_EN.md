@@ -358,3 +358,6 @@ If you want to dive deeper, recommended docs:
 - `documents/Documents_EN/instructions/04-Satis Workbench User Guide.md`
 
 Also, docs inside `documents/Documents_EN/satis_s_story` is also interesting!
+
+
+> This README is mostly written by using LLMs, I myself prompted.
