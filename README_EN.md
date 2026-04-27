@@ -2,7 +2,7 @@
 
 <h3 align="center">If one wishes to understand all Buddhas of the past, present, and future, one should contemplate the nature of reality: all is mind-made. — *Avatamsaka Sutra*</h3>
 
-> Preface: This repository is built as my personal side project and is unrelated to any research projects or topics from any school or company. I am currently a graduate student with my own research workload, so updates will be irregular based on availability. Thank you for your support.
+> Preface: This repository is built as my personal side project and is unrelated to any research projects or topics from any school or company. I am currently a graduate student with my own research workload, so updates will be irregular based on availability. Thank you for your support. I know there are a lot of improvements to make, please give me some time!
 >
 > You can use various agents to help you understand and run Satis. I specifically wrote a `README_AGENT.md`, and you can directly ask your agent to read this document first!
 

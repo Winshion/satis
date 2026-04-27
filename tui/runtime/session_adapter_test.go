@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"satis/bridge"
 	"satis/satis"
 	"satis/vfs"
 )
@@ -51,6 +52,51 @@ func TestPrepareWorkbenchPlanPathCreatesNewWorkbenchWithIntent(t *testing.T) {
 	}
 	if !strings.Contains(text, "\"intent_description\": \"整理新目录的执行意图\"") {
 		t.Fatalf("expected scaffolded intent description, got %s", text)
+	}
+}
+
+// TestClonePlanForIsolatedRunPreservesDescriptions verifies that IntentDescription and
+// PlanDescription are copied into the cloned plan. Previously both fields were omitted,
+// causing ValidateChunkGraphPlan to reject the clone with "must be non-empty" errors.
+func TestClonePlanForIsolatedRunPreservesDescriptions(t *testing.T) {
+	src := &bridge.ChunkGraphPlan{
+		ProtocolVersion:   1,
+		PlanID:            "plan_test",
+		IntentID:          "intent_test",
+		IntentDescription: "用户的执行意图",
+		PlanDescription:   "当前计划说明",
+		Goal:              "test goal",
+		EntryChunks:       []string{"CHK_A"},
+		Chunks: []bridge.PlanChunk{
+			{
+				ChunkID:     "CHK_A",
+				Kind:        "task",
+				Description: "test chunk",
+				Source: bridge.ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_A\nintent_uid: intent_test\ndescription: test chunk\nchunk_port: port_a\n\nPwd\n",
+				},
+			},
+		},
+		Edges: []bridge.PlanEdge{},
+	}
+	cloned, err := clonePlanForIsolatedRun(src, "RUN__")
+	if err != nil {
+		t.Fatalf("clonePlanForIsolatedRun: %v", err)
+	}
+	if cloned.IntentDescription != src.IntentDescription {
+		t.Errorf("IntentDescription: got %q want %q", cloned.IntentDescription, src.IntentDescription)
+	}
+	if cloned.PlanDescription != src.PlanDescription {
+		t.Errorf("PlanDescription: got %q want %q", cloned.PlanDescription, src.PlanDescription)
+	}
+	result := bridge.ValidateChunkGraphPlan(cloned)
+	if !result.Accepted {
+		var msgs []string
+		for _, iss := range result.ValidationErrors {
+			msgs = append(msgs, iss.Message)
+		}
+		t.Errorf("ValidateChunkGraphPlan rejected cloned plan: %s", strings.Join(msgs, "; "))
 	}
 }
 

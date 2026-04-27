@@ -804,12 +804,14 @@ func clonePlanForIsolatedRun(plan *bridge.ChunkGraphPlan, prefix string) (*bridg
 		idMap[chunk.ChunkID] = prefix + chunk.ChunkID
 	}
 	cloned := &bridge.ChunkGraphPlan{
-		ProtocolVersion: plan.ProtocolVersion,
-		PlanID:          fmt.Sprintf("%s__line_run_%d", slugPlanID(plan.PlanID), time.Now().UnixNano()),
-		IntentID:        plan.IntentID,
-		Goal:            plan.Goal + " (line run)",
-		Artifacts:       append([]bridge.ArtifactSpec(nil), plan.Artifacts...),
-		PlannerNotes:    append([]string(nil), plan.PlannerNotes...),
+		ProtocolVersion:   plan.ProtocolVersion,
+		PlanID:            fmt.Sprintf("%s__line_run_%d", slugPlanID(plan.PlanID), time.Now().UnixNano()),
+		IntentID:          plan.IntentID,
+		IntentDescription: plan.IntentDescription,
+		PlanDescription:   plan.PlanDescription,
+		Goal:              plan.Goal + " (line run)",
+		Artifacts:         append([]bridge.ArtifactSpec(nil), plan.Artifacts...),
+		PlannerNotes:      append([]string(nil), plan.PlannerNotes...),
 	}
 	if plan.Policies != nil {
 		policies := *plan.Policies
