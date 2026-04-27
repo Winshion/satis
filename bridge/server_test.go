@@ -1032,3 +1032,237 @@ func (s *stubBridgeVFS) Rename(context.Context, vfs.Txn, vfs.RenameInput) (vfs.F
 	return vfs.FileRef{}, nil
 }
 func (s *stubBridgeVFS) Glob(context.Context, string) ([]string, error) { return nil, nil }
+
+// TestFanInHandoffWriteExecutesDownstreamChunk is the regression test for the bug where
+// collectTerminalLeafChunkIDs excluded handoff edges, causing the fan-in sink chunk (CHK_003)
+// to be misclassified as a terminal leaf and auto-completed without executing its body.
+// After the fix, CHK_003 must actually run and produce a file in the VFS.
+func TestFanInHandoffWriteExecutesDownstreamChunk(t *testing.T) {
+	srv, mountDir := newDiskBackedTestServer(t)
+	ctx := context.Background()
+
+	// CHK_ROOT produces @port_root__output via Concat.
+	// CHK_001 receives it via handoff and produces @port__japanese.
+	// CHK_002 receives it via handoff and produces @port_2__english.
+	// CHK_003 receives both via handoff, merges, and writes to result.md.
+	// Topology: CHK_ROOT --control--> CHK_001 --control--> CHK_003
+	//                    --control--> CHK_002 --handoff--> CHK_003
+	plan := &ChunkGraphPlan{
+		PlanID:            "plan_fanin_handoff",
+		IntentID:          "intent_fanin",
+		IntentDescription: "fan-in handoff write regression",
+		PlanDescription:   "fan-in handoff write regression",
+		EntryChunks:       []string{"CHK_ROOT"},
+		Chunks: []PlanChunk{
+			{
+				ChunkID:     "CHK_ROOT",
+				Kind:        "task",
+				Description: "root chunk",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_ROOT\nintent_uid: intent_fanin\ndescription: root chunk\nchunk_port: port_root\n\nConcat [[[hello]]] [[[world]]] as @port_root__output\n",
+				},
+			},
+			{
+				ChunkID:     "CHK_001",
+				Kind:        "task",
+				Description: "japanese branch",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_001\nintent_uid: intent_fanin\ndescription: japanese branch\nchunk_port: port\n\nConcat @port_root__output [[[_jp]]] as @port__japanese\n",
+				},
+				Inputs: map[string]any{
+					"handoff_inputs": map[string]any{
+						"port_root__output": map[string]any{
+							"from_step": "CHK_ROOT",
+							"var_name":  "output",
+						},
+					},
+				},
+				DependsOn: []string{"CHK_ROOT"},
+			},
+			{
+				ChunkID:     "CHK_002",
+				Kind:        "task",
+				Description: "english branch",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_002\nintent_uid: intent_fanin\ndescription: english branch\nchunk_port: port_2\n\nConcat @port_root__output [[[_en]]] as @port_2__english\n",
+				},
+				Inputs: map[string]any{
+					"handoff_inputs": map[string]any{
+						"port_root__output": map[string]any{
+							"from_step": "CHK_ROOT",
+							"var_name":  "output",
+						},
+					},
+				},
+				DependsOn: []string{"CHK_ROOT"},
+			},
+			{
+				ChunkID:     "CHK_003",
+				Kind:        "task",
+				Description: "merge and write",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_003\nintent_uid: intent_fanin\ndescription: merge and write\nchunk_port: port_3\n\nConcat @port__japanese @port_2__english as @f\nWrite @f into /result.md\n",
+				},
+				Inputs: map[string]any{
+					"handoff_inputs": map[string]any{
+						"port__japanese": map[string]any{
+							"from_step": "CHK_001",
+							"var_name":  "japanese",
+						},
+						"port_2__english": map[string]any{
+							"from_step": "CHK_002",
+							"var_name":  "english",
+						},
+					},
+				},
+				DependsOn: []string{"CHK_001"},
+			},
+		},
+		Edges: []PlanEdge{
+			{FromChunkID: "CHK_ROOT", ToChunkID: "CHK_001", EdgeKind: "control"},
+			{FromChunkID: "CHK_ROOT", ToChunkID: "CHK_002", EdgeKind: "control"},
+			{FromChunkID: "CHK_001", ToChunkID: "CHK_003", EdgeKind: "control"},
+			{FromChunkID: "CHK_002", ToChunkID: "CHK_003", EdgeKind: "handoff"},
+		},
+	}
+
+	submit := srv.SubmitChunkGraph(plan)
+	if !submit.Accepted || submit.NormalizedPlan == nil {
+		t.Fatalf("submit failed: %#v", submit.ValidationErrors)
+	}
+	start, err := srv.StartRun(ctx, StartRunParams{PlanID: submit.NormalizedPlan.PlanID})
+	if err != nil {
+		t.Fatalf("StartRun: %v", err)
+	}
+
+	// planning_pending is the normal terminal state for a run without a planner.
+	inspect := waitForRunStatus(t, srv, start.RunID, func(r InspectRunResult) bool {
+		return r.Run.Status == RunPhasePlanningPending || isTerminalRunPhase(r.Run.Status)
+	})
+
+	if inspect.Run.Status != RunPhasePlanningPending {
+		t.Fatalf("expected run to finish as planning_pending, got %s; error=%#v", inspect.Run.Status, inspect.Run.Error)
+	}
+
+	// CHK_003 must NOT have been auto-completed — it must have actually executed.
+	chk003 := inspect.Chunks["CHK_003"]
+	if chk003.Status != ChunkPhaseSucceeded {
+		t.Fatalf("CHK_003 expected succeeded, got %s", chk003.Status)
+	}
+	if autoCompleted, _ := chk003.Control["auto_completed"].(bool); autoCompleted {
+		t.Fatal("CHK_003 was auto-completed without executing — handoff edge fix did not take effect")
+	}
+	if chk003.StartedAt == nil {
+		t.Fatal("CHK_003 has no StartedAt — it was never truly executed")
+	}
+
+	// The write instruction in CHK_003 must have produced result.md on disk.
+	resultPath := filepath.Join(mountDir, "result.md")
+	content, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatalf("result.md not found at %s: %v", resultPath, err)
+	}
+	got := string(content)
+	if !strings.Contains(got, "helloworld_jp") || !strings.Contains(got, "helloworld_en") {
+		t.Fatalf("result.md content unexpected: %q", got)
+	}
+}
+
+// TestParallelBranchesAllExecuteWithHeapGuard verifies that with the h.Len()==0 guard,
+// parallel control-flow branches that are both queued in the heap both actually run.
+// The auto-complete shortcut only fires when the heap is empty, so branches that are
+// already queued for execution will not be skipped.
+func TestParallelBranchesAllExecuteWithHeapGuard(t *testing.T) {
+	srv, mountDir := newDiskBackedTestServer(t)
+	ctx := context.Background()
+
+	// CHK_ROOT --control--> CHK_A (writes fileA)
+	//          --control--> CHK_B (writes fileB)
+	// Both become Ready simultaneously when CHK_ROOT finishes and are pushed into
+	// the heap together. Since h.Len() > 0 when CHK_A finishes, auto-complete
+	// does not fire and CHK_B also runs normally.
+	plan := &ChunkGraphPlan{
+		PlanID:            "plan_parallel_leaf",
+		IntentID:          "intent_parallel",
+		IntentDescription: "parallel leaf both execute",
+		PlanDescription:   "parallel leaf both execute",
+		EntryChunks:       []string{"CHK_ROOT"},
+		Chunks: []PlanChunk{
+			{
+				ChunkID:     "CHK_ROOT",
+				Kind:        "task",
+				Description: "entry",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_ROOT\nintent_uid: intent_parallel\ndescription: entry\nchunk_port: port_root\n\nPrint [[[started]]]\n",
+				},
+			},
+			{
+				ChunkID:     "CHK_A",
+				Kind:        "task",
+				Description: "branch A",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_A\nintent_uid: intent_parallel\ndescription: branch A\nchunk_port: port_a\n\nWrite [[[from_a]]] into /leaf_a.txt\n",
+				},
+				DependsOn: []string{"CHK_ROOT"},
+			},
+			{
+				ChunkID:     "CHK_B",
+				Kind:        "task",
+				Description: "branch B",
+				Source: ChunkSource{
+					Format:    "satis_v1",
+					SatisText: "chunk_id: CHK_B\nintent_uid: intent_parallel\ndescription: branch B\nchunk_port: port_b\n\nWrite [[[from_b]]] into /leaf_b.txt\n",
+				},
+				DependsOn: []string{"CHK_ROOT"},
+			},
+		},
+		Edges: []PlanEdge{
+			{FromChunkID: "CHK_ROOT", ToChunkID: "CHK_A", EdgeKind: "control"},
+			{FromChunkID: "CHK_ROOT", ToChunkID: "CHK_B", EdgeKind: "control"},
+		},
+	}
+
+	submit := srv.SubmitChunkGraph(plan)
+	if !submit.Accepted || submit.NormalizedPlan == nil {
+		t.Fatalf("submit failed: %#v", submit.ValidationErrors)
+	}
+	start, err := srv.StartRun(ctx, StartRunParams{PlanID: submit.NormalizedPlan.PlanID})
+	if err != nil {
+		t.Fatalf("StartRun: %v", err)
+	}
+
+	inspect := waitForRunStatus(t, srv, start.RunID, func(r InspectRunResult) bool {
+		return r.Run.Status == RunPhasePlanningPending || isTerminalRunPhase(r.Run.Status)
+	})
+	if inspect.Run.Status != RunPhasePlanningPending {
+		t.Fatalf("expected planning_pending, got %s; error=%#v", inspect.Run.Status, inspect.Run.Error)
+	}
+
+	// Both branches must be succeeded and must have actually executed (StartedAt set).
+	for _, id := range []string{"CHK_A", "CHK_B"} {
+		ch := inspect.Chunks[id]
+		if ch.Status != ChunkPhaseSucceeded {
+			t.Fatalf("%s expected succeeded, got %s", id, ch.Status)
+		}
+		if ch.StartedAt == nil {
+			t.Fatalf("%s has no StartedAt — it was auto-completed without executing", id)
+		}
+		if autoCompleted, _ := ch.Control["auto_completed"].(bool); autoCompleted {
+			t.Fatalf("%s was incorrectly auto-completed", id)
+		}
+	}
+
+	// Both files must exist on disk because both chunks ran.
+	if got := mustReadFile(t, filepath.Join(mountDir, "leaf_a.txt")); got != "from_a" {
+		t.Fatalf("leaf_a.txt: got %q want from_a", got)
+	}
+	if got := mustReadFile(t, filepath.Join(mountDir, "leaf_b.txt")); got != "from_b" {
+		t.Fatalf("leaf_b.txt: got %q want from_b", got)
+	}
+}

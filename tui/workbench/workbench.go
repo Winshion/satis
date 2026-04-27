@@ -127,6 +127,7 @@ func New(ctx context.Context, backend Backend, path string, promptPlanDescriptio
 	wb.appendLog("commands: render, validate, save, submit, start, run, status, inspect, events, chunk, reload, quit, quit!, help")
 	wb.appendLog("planning: plan-continue <json> | plan-change <json> | plan-detach | plan-prev | plan-next | plan-draft <prompt> | plan-finish")
 	wb.appendLog("shortcuts: Option+1..4 focus DAG/chunk/decision/cli (macOS) | Ctrl+Shift+R render | Ctrl+N add task chunk (DAG) | Shift+D add decision chunk (DAG) | Ctrl+T toggle task/decision (DAG) | Ctrl+K remove chunk (DAG)")
+	syncPlanExecutionCWD(backend, model.ResolvedPath)
 	return wb, nil
 }
 
@@ -1173,6 +1174,7 @@ func (a *App) openRegisteredPlan(targetPath string, label string) error {
 		return fmt.Errorf("open %s plan %s failed: %w", label, targetPath, err)
 	}
 	a.model = model
+	syncPlanExecutionCWD(a.backend, a.model.ResolvedPath)
 	a.currentChunkID = ""
 	a.currentHandoffKey = ""
 	a.lastSubmittedPlanID = ""
@@ -2739,6 +2741,7 @@ func (a *App) runCommand(raw string) {
 			return
 		}
 		a.model = model
+		syncPlanExecutionCWD(a.backend, a.model.ResolvedPath)
 		a.currentChunkID = ""
 		a.refreshGraphView()
 		a.loadChunk(a.model.SelectedChunkID)

@@ -156,6 +156,30 @@ func (a *SessionAdapter) Close(ctx context.Context) error {
 	return a.session.Close(ctx)
 }
 
+// SetPlanExecutionCWD sets VFS initial working directory to the directory containing the workbench plan.
+// Relative paths in chunk bodies (e.g. write into notes.md) resolve against this directory.
+func (a *SessionAdapter) SetPlanExecutionCWD(planPath string) {
+	if a == nil || a.executor == nil {
+		return
+	}
+	planPath = strings.TrimSpace(planPath)
+	if planPath == "" {
+		return
+	}
+	dir := path.Dir(planPath)
+	if dir == "." || dir == "" {
+		dir = "/"
+	}
+	dir = path.Clean(dir)
+	if !strings.HasPrefix(dir, "/") {
+		dir = "/" + dir
+	}
+	a.executor.InitialCWD = dir
+	if a.bridge != nil {
+		a.bridge.SetInitialCWD(dir)
+	}
+}
+
 func (a *SessionAdapter) CurrentCWD() string {
 	if a == nil || a.session == nil {
 		return "/"

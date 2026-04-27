@@ -361,3 +361,16 @@ Also, docs inside `documents/Documents_EN/satis_s_story` is also interesting!
 
 
 > This README is mostly written by using LLMs, I myself prompted.
+
+---
+
+## Citation
+
+If you use this project in academic work or public outputs, please cite it as:
+
+```text
+Huang, Wilson. satis (Version 0.0.1). Released 2026-04-27.
+https://github.com/Winshion/satis
+```
+
+You can also use the `CITATION.cff` file in the repository root.

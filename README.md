@@ -369,3 +369,16 @@ To view a copy of this license, visit [http://creativecommons.org/licenses/by-nc
 当然，`documents/Documents_EN/satis_s_story`里的文档也挺有意思的！
 
 > 本README文档大部分由 LLM 辅助撰写，我提供写作思路与灵感
+
+---
+
+## 引用（Citation）
+
+如果你在学术工作或公开成果中使用了本项目，请按以下信息引用：
+
+```text
+Huang, Wilson. satis (Version 0.0.1). Released 2026-04-27.
+https://github.com/Winshion/satis
+```
+
+也可参考仓库根目录的 `CITATION.cff`。

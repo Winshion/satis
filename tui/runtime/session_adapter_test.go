@@ -20,6 +20,14 @@ func newSessionAdapterForTest(t *testing.T) *SessionAdapter {
 	return adapter
 }
 
+func TestSetPlanExecutionCWDUsesPlanDirectory(t *testing.T) {
+	adapter := newSessionAdapterForTest(t)
+	adapter.SetPlanExecutionCWD("/demo/plan.json")
+	if got := adapter.executor.InitialCWD; got != "/demo" {
+		t.Fatalf("executor InitialCWD: got %q want /demo", got)
+	}
+}
+
 func TestPrepareWorkbenchPlanPathRequiresIntentForNewDirectory(t *testing.T) {
 	adapter := newSessionAdapterForTest(t)
 	_, _, err := adapter.prepareWorkbenchPlanPath(context.Background(), "/plans/new_one", "")

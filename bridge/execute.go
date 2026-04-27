@@ -261,7 +261,12 @@ func (s *Server) executeRun(ctx context.Context, record *runRecord, options Exec
 				completedLeafThisBatch = chunkID
 			}
 		}
-		if completedLeafThisBatch != "" && !hasAnyFailed && activeWorkIsLimitedToTerminalLeaves(record, terminalLeafChunks) {
+		// Only short-circuit when the ready heap is empty: if any chunk is still
+		// queued it must execute first. This guards against a race where a newly
+		// promoted chunk is both pushed onto the heap and visible as a terminal leaf
+		// in Pending/Ready state, which would cause it to be auto-completed before
+		// it actually runs.
+		if completedLeafThisBatch != "" && !hasAnyFailed && h.Len() == 0 && activeWorkIsLimitedToTerminalLeaves(record, terminalLeafChunks) {
 			s.autoCompleteTerminalLeaves(record, completedLeafThisBatch, terminalLeafChunks)
 			s.transitionRunToPlanningPending(record)
 			return
@@ -1322,7 +1327,12 @@ func collectTerminalLeafChunkIDs(plan *ChunkGraphPlan) map[string]struct{} {
 	}
 	for _, edge := range plan.Edges {
 		kind := strings.ToLower(strings.TrimSpace(edge.EdgeKind))
-		if kind == "handoff" || kind == "loop_back" {
+		// loop_back is a back-edge that revisits an upstream node; excluding it keeps
+		// the leaf classification stable. handoff edges however represent real data
+		// flow between task chunks, so they must count as outgoing edges — otherwise
+		// a chunk whose only downstream consumers are connected via handoff is
+		// misclassified as a terminal leaf and may be auto-completed without executing.
+		if kind == "loop_back" {
 			continue
 		}
 		outgoing[edge.FromChunkID]++
